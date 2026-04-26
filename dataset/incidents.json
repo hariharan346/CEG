@@ -1,0 +1,212 @@
+[
+  {
+    "issue": "Pod CrashLoopBackOff",
+    "cause": "The application inside the pod is crashing immediately after startup due to a misconfiguration, missing environment variables, or a fatal error in the code.",
+    "suggested_fix": "Check the pod logs to identify the exact error. Ensure all required environment variables and secrets are mounted.",
+    "kubectl_command": "kubectl logs <pod-name> --previous",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: pod-failure\n  namespace: default\nspec:\n  action: pod-failure\n  mode: one\n  duration: '30s'\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "OOMKilled",
+    "cause": "The pod exceeded its memory limit and was killed by the kernel.",
+    "suggested_fix": "Increase the memory limit in the pod specification or profile the application to reduce memory usage.",
+    "kubectl_command": "kubectl describe pod <pod-name> | grep -i oom",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: StressChaos\nmetadata:\n  name: memory-stress\n  namespace: default\nspec:\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app\n  stressors:\n    memory:\n      workers: 4\n      size: '256MB'\n  duration: '30s'"
+  },
+  {
+    "issue": "ImagePullBackOff",
+    "cause": "Kubernetes cannot pull the container image because the image name is wrong, the tag doesn't exist, or authentication to the registry failed.",
+    "suggested_fix": "Verify the image name and tag. Ensure imagePullSecrets are properly configured if using a private registry.",
+    "kubectl_command": "kubectl describe pod <pod-name> | grep -i 'Failed to pull image'",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: pod-kill\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "NodeNotReady",
+    "cause": "The Kubernetes node is unresponsive, perhaps due to heavy load, disk pressure, or a kubelet failure.",
+    "suggested_fix": "Check node metrics. Restart kubelet on the affected node or drain the node and replace it.",
+    "kubectl_command": "kubectl describe node <node-name>",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: StressChaos\nmetadata:\n  name: cpu-stress\n  namespace: default\nspec:\n  mode: all\n  selector:\n    labelSelectors:\n      app: demo-app\n  stressors:\n    cpu:\n      workers: 4\n      load: 100\n  duration: '60s'"
+  },
+  {
+    "issue": "Pending Pods",
+    "cause": "Pods cannot be scheduled because of insufficient resources (CPU/Memory) in the cluster or unmet node affinity/taints.",
+    "suggested_fix": "Add more nodes to the cluster or adjust pod resource requests.",
+    "kubectl_command": "kubectl describe pod <pod-name> | grep -i warning",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: pod-failure-pending\n  namespace: default\nspec:\n  action: pod-failure\n  mode: all\n  duration: '60s'\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "NetworkPartition",
+    "cause": "Communication between microservices is failing due to a network issue or CNI failure.",
+    "suggested_fix": "Check network policies and CNI plugin status. Ensure firewall rules allow pod-to-pod communication.",
+    "kubectl_command": "kubectl get networkpolicies --all-namespaces",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: NetworkChaos\nmetadata:\n  name: network-delay\n  namespace: default\nspec:\n  action: delay\n  mode: all\n  selector:\n    labelSelectors:\n      app: demo-app\n  delay:\n    latency: '200ms'\n    correlation: '100'\n    jitter: '0ms'\n  duration: '30s'"
+  },
+  {
+    "issue": "High CPU Usage",
+    "cause": "The application is consuming excessive CPU, leading to throttling and slow response times.",
+    "suggested_fix": "Profile the application for infinite loops or heavy computation. Increase CPU limits.",
+    "kubectl_command": "kubectl top pods",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: StressChaos\nmetadata:\n  name: high-cpu\n  namespace: default\nspec:\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app\n  stressors:\n    cpu:\n      workers: 2\n      load: 100\n  duration: '60s'"
+  },
+  {
+    "issue": "DNS Resolution Failed",
+    "cause": "CoreDNS is failing to resolve service names to IP addresses.",
+    "suggested_fix": "Check CoreDNS pod logs and ensure the kube-dns service is running.",
+    "kubectl_command": "kubectl logs -l k8s-app=kube-dns -n kube-system",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: DNSChaos\nmetadata:\n  name: dns-error\n  namespace: default\nspec:\n  action: error\n  mode: all\n  selector:\n    labelSelectors:\n      app: demo-app\n  duration: '30s'"
+  },
+  {
+    "issue": "PersistentVolumeClaim Pending",
+    "cause": "No suitable PersistentVolume is available, or the storage class provisioner failed.",
+    "suggested_fix": "Ensure the StorageClass exists and the provisioner pod is healthy.",
+    "kubectl_command": "kubectl describe pvc <pvc-name>",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: IOChaos\nmetadata:\n  name: io-delay\n  namespace: default\nspec:\n  action: latency\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app\n  volumePath: /data\n  path: /data/**/*\n  delay: '100ms'\n  percent: 100\n  duration: '60s'"
+  },
+  {
+    "issue": "Service 503 Service Unavailable",
+    "cause": "The service has no active endpoints because the backing pods are crashing or failing readiness probes.",
+    "suggested_fix": "Check the readiness probe configuration and the underlying pod health.",
+    "kubectl_command": "kubectl get endpoints <service-name>",
+    "chaos_experiment": "apiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: pod-kill-endpoints\n  namespace: default\nspec:\n  action: pod-kill\n  mode: all\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Database Connection Timeout",
+    "cause": "DB is overloaded",
+    "suggested_fix": "Scale DB",
+    "kubectl_command": "kubectl get pods -l app=db",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (delay) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Redis Connection Refused",
+    "cause": "Redis pod restarted",
+    "suggested_fix": "Check Redis logs",
+    "kubectl_command": "kubectl logs -l app=redis",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill redis) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Ingress 502 Bad Gateway",
+    "cause": "Ingress controller cannot reach service",
+    "suggested_fix": "Check Ingress rules",
+    "kubectl_command": "kubectl describe ingress",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (loss) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Node Disk Pressure",
+    "cause": "Node root filesystem is full",
+    "suggested_fix": "Clear unused images or add disk space",
+    "kubectl_command": "kubectl describe node",
+    "chaos_experiment": "# Chaos spec for StressChaos (io) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Evicted Pods",
+    "cause": "Pod was evicted due to node resource shortage",
+    "suggested_fix": "Increase node pool size",
+    "kubectl_command": "kubectl get pods | grep Evicted",
+    "chaos_experiment": "# Chaos spec for StressChaos (memory) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "SSL Certificate Expired",
+    "cause": "Cert-manager failed to renew",
+    "suggested_fix": "Check cert-manager logs",
+    "kubectl_command": "kubectl get certificates",
+    "chaos_experiment": "# Chaos spec for TimeChaos goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Readiness Probe Failed",
+    "cause": "App is deadlocking or too slow to respond",
+    "suggested_fix": "Optimize app startup or adjust probe timeouts",
+    "kubectl_command": "kubectl describe pod",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (latency) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Liveness Probe Failed",
+    "cause": "App is hanging",
+    "suggested_fix": "Fix the bug causing the hang",
+    "kubectl_command": "kubectl describe pod",
+    "chaos_experiment": "# Chaos spec for PodChaos (failure) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "ConfigMap Not Found",
+    "cause": "Typo in ConfigMap name in Deployment",
+    "suggested_fix": "Create ConfigMap or fix Deployment",
+    "kubectl_command": "kubectl get cm",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Secret Not Found",
+    "cause": "Typo in Secret name",
+    "suggested_fix": "Create Secret",
+    "kubectl_command": "kubectl get secret",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "CPU Throttling",
+    "cause": "CPU limits are too low",
+    "suggested_fix": "Increase CPU limits",
+    "kubectl_command": "kubectl top pod",
+    "chaos_experiment": "# Chaos spec for StressChaos (cpu) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Memory Leak",
+    "cause": "App memory grows unbounded",
+    "suggested_fix": "Fix code",
+    "kubectl_command": "kubectl top pod",
+    "chaos_experiment": "# Chaos spec for StressChaos (memory) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Too Many Open Files",
+    "cause": "Ulimit exceeded",
+    "suggested_fix": "Increase ulimit in pod security context",
+    "kubectl_command": "kubectl logs",
+    "chaos_experiment": "# Chaos spec for IOChaos (fault) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Connection Reset by Peer",
+    "cause": "Load balancer drops long-lived connections",
+    "suggested_fix": "Adjust keep-alive timeouts",
+    "kubectl_command": "kubectl logs ingress",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (loss) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Split Brain in Cluster",
+    "cause": "Network partition in stateful set",
+    "suggested_fix": "Resolve partition manually",
+    "kubectl_command": "kubectl logs statefulset",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (partition) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Job Timeout",
+    "cause": "CronJob takes too long",
+    "suggested_fix": "Optimize Job or increase activeDeadlineSeconds",
+    "kubectl_command": "kubectl describe job",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Zombie Processes",
+    "cause": "Init process not reaping zombies",
+    "suggested_fix": "Use dumb-init or fix app",
+    "kubectl_command": "ps aux",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Too Many Requests 429",
+    "cause": "Rate limit exceeded",
+    "suggested_fix": "Implement backoff in clients",
+    "kubectl_command": "kubectl logs",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (delay) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Unauthorized 401",
+    "cause": "Invalid token passed between services",
+    "suggested_fix": "Check token issuer",
+    "kubectl_command": "kubectl logs",
+    "chaos_experiment": "# Chaos spec for NetworkChaos (corrupt) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  },
+  {
+    "issue": "Forbidden 403",
+    "cause": "RBAC lacks permissions",
+    "suggested_fix": "Add RoleBinding",
+    "kubectl_command": "kubectl auth can-i",
+    "chaos_experiment": "# Chaos spec for PodChaos (kill) goes here\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: generic-chaos\n  namespace: default\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    labelSelectors:\n      app: demo-app"
+  }
+]

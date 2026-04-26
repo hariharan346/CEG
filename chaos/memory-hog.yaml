@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: memory-hog
+  namespace: default
+spec:
+  mode: one
+  selector:
+    labelSelectors:
+      app: demo-app
+  stressors:
+    memory:
+      workers: 4
+      size: "256MB"
+  duration: "60s"
